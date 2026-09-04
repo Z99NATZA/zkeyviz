@@ -1,9 +1,18 @@
-fn main() {
-    println!("Available input devices:");
+use evdev::Device;
+use std::{env, error::Error};
 
-    for (path, device) in evdev::enumerate() {
-        let name = device.name().unwrap_or("Unknown device");
+const DEFAULT_DEVICE: &str = "/dev/input/by-id/usb-ROYUAN_Gaming_keyboard-event-kbd";
 
-        println!("{}: {}", path.display(), name);
-    }
+fn main() -> Result<(), Box<dyn Error>> {
+    let path = env::args()
+        .nth(1)
+        .unwrap_or_else(|| DEFAULT_DEVICE.to_owned());
+
+    let device = Device::open(&path)?;
+    let name = device.name().unwrap_or("Unknown device");
+
+    println!("Using keyboard: {name}");
+    println!("Device path: {path}");
+
+    Ok(())
 }
