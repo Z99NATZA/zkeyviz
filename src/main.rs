@@ -19,22 +19,28 @@ fn key_state(value: i32) -> Option<KeyState> {
     }
 }
 
-fn handle_event(event: InputEvent, pressed_keys: &mut HashSet<KeyCode>) {
+fn handle_event(event: InputEvent, pressed_keys: &mut HashSet<KeyCode>) -> bool {
+    let mut change = false;
+
     if let EventSummary::Key(_, key, value) = event.destructure() {
         if let Some(state) = key_state(value) {
             match state {
                 KeyState::Pressed => {
-                    pressed_keys.insert(key);
+                    change = pressed_keys.insert(key);
                 }
                 KeyState::Released => {
-                    pressed_keys.remove(&key);
+                    change = pressed_keys.remove(&key);
                 }
                 KeyState::Repeated => {}
             }
-
-            println!("{pressed_keys:?}");
         }
     }
+
+    change
+}
+
+fn render(pressed_keys: &HashSet<KeyCode>) {
+    println!("{pressed_keys:?}");
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -51,7 +57,9 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     loop {
         for event in device.fetch_events()? {
-            handle_event(event, &mut pressed_keys);
+            if handle_event(event, &mut pressed_keys) {
+                render(&pressed_keys);
+            }
         }
     }
 }
