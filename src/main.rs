@@ -1,4 +1,4 @@
-use evdev::{Device, EventSummary};
+use evdev::{Device, EventSummary, InputEvent};
 use std::{env, error::Error};
 
 const DEFAULT_DEVICE: &str = "/dev/input/by-id/usb-ROYUAN_Gaming_keyboard-event-kbd";
@@ -19,6 +19,14 @@ fn key_state(value: i32) -> Option<KeyState> {
     }
 }
 
+fn handle_event(event: InputEvent) {
+    if let EventSummary::Key(_, key, value) = event.destructure() {
+        if let Some(state) = key_state(value) {
+            println!("{key:?} -> {state:?}");
+        }
+    }
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     let path = env::args()
         .nth(1)
@@ -32,11 +40,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     loop {
         for event in device.fetch_events()? {
-            if let EventSummary::Key(_, key, value) = event.destructure() {
-                if let Some(state) = key_state(value) {
-                    println!("{key:?} -> {state:?}");
-                }
-            }
+            handle_event(event);
         }
     }
 }
