@@ -22,17 +22,21 @@ fn key_state(value: i32) -> Option<KeyState> {
 fn handle_event(event: InputEvent, pressed_keys: &mut HashSet<KeyCode>) -> bool {
     let mut change = false;
 
-    if let EventSummary::Key(_, key, value) = event.destructure() {
-        if let Some(state) = key_state(value) {
-            match state {
-                KeyState::Pressed => {
-                    change = pressed_keys.insert(key);
-                }
-                KeyState::Released => {
-                    change = pressed_keys.remove(&key);
-                }
-                KeyState::Repeated => {}
+    if let EventSummary::Key(_, key, value) = event.destructure()
+        && let Some(state) = key_state(value)
+    {
+        if key == KeyCode::KEY_ESC {
+            std::process::exit(0);
+        }
+
+        match state {
+            KeyState::Pressed => {
+                change = pressed_keys.insert(key);
             }
+            KeyState::Released => {
+                change = pressed_keys.remove(&key);
+            }
+            KeyState::Repeated => {}
         }
     }
 
@@ -40,7 +44,21 @@ fn handle_event(event: InputEvent, pressed_keys: &mut HashSet<KeyCode>) -> bool 
 }
 
 fn render(pressed_keys: &HashSet<KeyCode>) {
-    println!("{pressed_keys:?}");
+    let keys: Vec<String> = pressed_keys.iter().map(|key| key_name(*key)).collect();
+
+    if !keys.is_empty() {
+        println!("{}", keys.join(""));
+    }
+}
+
+fn key_name(key: KeyCode) -> String {
+    let key = format!("{key:?}");
+    let res = key.strip_prefix("KEY_").unwrap_or(&key);
+
+    res.strip_prefix("LEFT")
+        .or_else(|| res.strip_prefix("RIGHT"))
+        .unwrap_or(res)
+        .to_owned()
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -49,6 +67,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .unwrap_or_else(|| DEFAULT_DEVICE.to_owned());
 
     let mut device = Device::open(&path)?;
+    device.grab()?;
     let name = device.name().unwrap_or("Unknown device");
     let mut pressed_keys = HashSet::new();
 
