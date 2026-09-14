@@ -1,4 +1,5 @@
 use evdev::{Device, EventSummary, InputEvent, KeyCode};
+use std::io::{self, Write};
 use std::{collections::HashSet, env, error::Error};
 
 const DEFAULT_DEVICE: &str = "/dev/input/by-id/usb-ROYUAN_Gaming_keyboard-event-kbd";
@@ -34,7 +35,7 @@ fn handle_event(event: InputEvent, pressed_keys: &mut HashSet<KeyCode>) -> bool 
                 change = pressed_keys.insert(key);
             }
             KeyState::Released => {
-                change = pressed_keys.remove(&key);
+                pressed_keys.remove(&key);
             }
             KeyState::Repeated => {}
         }
@@ -43,12 +44,11 @@ fn handle_event(event: InputEvent, pressed_keys: &mut HashSet<KeyCode>) -> bool 
     change
 }
 
-fn render(pressed_keys: &HashSet<KeyCode>) {
+fn render(pressed_keys: &HashSet<KeyCode>, texts: &mut String) {
     let keys: Vec<String> = pressed_keys.iter().map(|key| key_name(*key)).collect();
-
-    if !keys.is_empty() {
-        println!("{}", keys.join(""));
-    }
+    *texts = format!("{texts} {}", keys.join(""));
+    print!("\r{texts}");
+    let _ = io::stdout().flush();
 }
 
 fn key_name(key: KeyCode) -> String {
@@ -70,6 +70,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     device.grab()?;
     let name = device.name().unwrap_or("Unknown device");
     let mut pressed_keys = HashSet::new();
+    let mut texts = String::new();
 
     println!("Using keyboard: {name}");
     println!("Device path: {path}");
@@ -77,7 +78,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     loop {
         for event in device.fetch_events()? {
             if handle_event(event, &mut pressed_keys) {
-                render(&pressed_keys);
+                render(&pressed_keys, &mut texts);
             }
         }
     }
