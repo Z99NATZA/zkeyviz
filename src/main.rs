@@ -11,6 +11,8 @@ enum KeyState {
     Repeated,
 }
 
+const DISPLAY_MAX: usize = 50;
+
 fn key_state(value: i32) -> Option<KeyState> {
     match value {
         0 => Some(KeyState::Released),
@@ -20,19 +22,14 @@ fn key_state(value: i32) -> Option<KeyState> {
     }
 }
 
-fn handle_event(event: InputEvent, pressed_keys: &mut HashSet<KeyCode>) -> bool {
-    let mut change = false;
-
+fn handle_event(event: InputEvent, pressed_keys: &mut HashSet<KeyCode>) -> Option<KeyCode> {
     if let EventSummary::Key(_, key, value) = event.destructure()
         && let Some(state) = key_state(value)
     {
-        if key == KeyCode::KEY_ESC {
-            std::process::exit(0);
-        }
-
         match state {
             KeyState::Pressed => {
-                change = pressed_keys.insert(key);
+                pressed_keys.insert(key);
+                return Some(key);
             }
             KeyState::Released => {
                 pressed_keys.remove(&key);
@@ -41,24 +38,58 @@ fn handle_event(event: InputEvent, pressed_keys: &mut HashSet<KeyCode>) -> bool 
         }
     }
 
-    change
+    None
 }
 
-fn render(pressed_keys: &HashSet<KeyCode>, texts: &mut String) {
-    let keys: Vec<String> = pressed_keys.iter().map(|key| key_name(*key)).collect();
-    *texts = format!("{texts} {}", keys.join(""));
-    print!("\r{texts}");
+fn print_scroll(text: &str) {
+    let display: String = text
+        .chars()
+        .rev()
+        .take(DISPLAY_MAX)
+        .collect::<Vec<char>>()
+        .into_iter()
+        .rev()
+        .collect();
+
+    print!("\x1B[?25l\r\x1B[2K{:<DISPLAY_MAX$}", display);
     let _ = io::stdout().flush();
 }
 
-fn key_name(key: KeyCode) -> String {
+fn formatting(key: KeyCode) -> String {
     let key = format!("{key:?}");
-    let res = key.strip_prefix("KEY_").unwrap_or(&key);
+    let result = clean_display_text(key.clone());
+    result
+}
 
-    res.strip_prefix("LEFT")
-        .or_else(|| res.strip_prefix("RIGHT"))
-        .unwrap_or(res)
-        .to_owned()
+fn clean_display_text(text: String) -> String {
+    let mut cleaned = text.to_lowercase().replace("key_", "").replace("key", "");
+
+    let remove_targets = vec![
+        "leftctrl",
+        "rightctrl",
+        "leftshift",
+        "rightshift",
+        "leftalt",
+        "rightalt",
+        "leftmeta",
+        "rightmeta",
+        "capslock",
+        "tab",
+        "enter",
+        "escape",
+    ];
+
+    for target in remove_targets {
+        cleaned = cleaned.replace(target, "");
+    }
+
+    cleaned = match cleaned.as_str() {
+        "backspace" => " <- ".to_string(),
+        "space" => " ".to_string(),
+        _ => cleaned,
+    };
+
+    cleaned.to_lowercase()
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -67,7 +98,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         .unwrap_or_else(|| DEFAULT_DEVICE.to_owned());
 
     let mut device = Device::open(&path)?;
-    device.grab()?;
     let name = device.name().unwrap_or("Unknown device");
     let mut pressed_keys = HashSet::new();
     let mut texts = String::new();
@@ -77,9 +107,12 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     loop {
         for event in device.fetch_events()? {
-            if handle_event(event, &mut pressed_keys) {
-                render(&pressed_keys, &mut texts);
+            if let Some(key) = handle_event(event, &mut pressed_keys) {
+                let key = formatting(key);
+                texts = format!("{texts}{key}");
+                print_scroll(texts.as_str());
             }
         }
     }
 }
+
