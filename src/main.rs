@@ -55,9 +55,17 @@ fn print_scroll(text: &str) {
     let _ = io::stdout().flush();
 }
 
-fn formatting(key: KeyCode) -> String {
+fn formatting(key: KeyCode, started_shift: &mut bool) -> String {
     let key = format!("{key:?}");
     let result = clean_display_text(key.clone());
+
+    if result.contains("shift") {
+        *started_shift = true;
+        return "^".to_string();
+    } else if *started_shift {
+        *started_shift = false;
+        return result.to_uppercase();
+    }
     result
 }
 
@@ -67,8 +75,6 @@ fn clean_display_text(text: String) -> String {
     let remove_targets = vec![
         "leftctrl",
         "rightctrl",
-        "leftshift",
-        "rightshift",
         "leftalt",
         "rightalt",
         "leftmeta",
@@ -101,6 +107,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let name = device.name().unwrap_or("Unknown device");
     let mut pressed_keys = HashSet::new();
     let mut texts = String::new();
+    let mut started_shift = false;
 
     println!("Using keyboard: {name}");
     println!("Device path: {path}");
@@ -108,7 +115,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     loop {
         for event in device.fetch_events()? {
             if let Some(key) = handle_event(event, &mut pressed_keys) {
-                let key = formatting(key);
+                let key = formatting(key, &mut started_shift);
                 texts = format!("{texts}{key}");
                 print_scroll(texts.as_str());
             }
