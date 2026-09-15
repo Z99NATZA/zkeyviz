@@ -57,15 +57,25 @@ fn print_scroll(text: &str) {
 
 fn formatting(key: KeyCode, started_shift: &mut bool) -> String {
     let key = format!("{key:?}");
-    let result = clean_display_text(key.clone());
+    let key = key.to_lowercase().replace("left", "").replace("right", "");
+    let mut result = String::new();
 
-    if result.contains("shift") {
+    if key.contains("shift") {
         *started_shift = true;
         return "^".to_string();
-    } else if *started_shift {
-        *started_shift = false;
-        return result.to_uppercase();
+    } else if key.contains("ctrl") {
+        result = "Ctrl ".to_string();
+    } else if key.contains("alt") {
+        result = "Alt ".to_string();
+    } else {
+        result = clean_display_text(key.clone());
+
+        if *started_shift {
+            *started_shift = false;
+            return result.to_uppercase();
+        }
     }
+
     result
 }
 
@@ -73,8 +83,6 @@ fn clean_display_text(text: String) -> String {
     let mut cleaned = text.to_lowercase().replace("key_", "").replace("key", "");
 
     let remove_targets = vec![
-        "leftctrl",
-        "rightctrl",
         "leftalt",
         "rightalt",
         "leftmeta",
@@ -116,10 +124,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         for event in device.fetch_events()? {
             if let Some(key) = handle_event(event, &mut pressed_keys) {
                 let key = formatting(key, &mut started_shift);
-                texts = format!("{texts}{key}");
+                texts.push_str(key.as_str());
                 print_scroll(texts.as_str());
             }
         }
     }
 }
-
