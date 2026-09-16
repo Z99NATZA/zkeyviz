@@ -62,44 +62,32 @@ fn formatting(key: KeyCode, started_shift: &mut bool) -> String {
 
     if key.contains("shift") {
         *started_shift = true;
-        return "^".to_string();
+        return "⌅ ".to_string();
     } else if key.contains("ctrl") {
-        result = "Ctrl ".to_string();
+        result = "Ctrl".to_string();
     } else if key.contains("alt") {
-        result = "Alt ".to_string();
+        result = "Alt".to_string();
     } else {
         result = clean_display_text(key.clone());
 
         if *started_shift {
             *started_shift = false;
-            return result.to_uppercase();
+            result = result.to_uppercase();
         }
     }
 
-    result
+    format!("{result} ")
 }
 
 fn clean_display_text(text: String) -> String {
     let mut cleaned = text.to_lowercase().replace("key_", "").replace("key", "");
 
-    let remove_targets = vec![
-        "leftalt",
-        "rightalt",
-        "leftmeta",
-        "rightmeta",
-        "capslock",
-        "tab",
-        "enter",
-        "escape",
-    ];
-
-    for target in remove_targets {
-        cleaned = cleaned.replace(target, "");
-    }
-
     cleaned = match cleaned.as_str() {
-        "backspace" => " <- ".to_string(),
-        "space" => " ".to_string(),
+        "backspace" => "⇤".to_string(),
+        "backslash" => "\\".to_string(),
+        "space" => "␣".to_string(),
+        "enter" => "⮠".to_string(),
+        "meta" => "super ".to_string(),
         _ => cleaned,
     };
 
