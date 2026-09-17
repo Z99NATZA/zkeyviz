@@ -1,8 +1,10 @@
 use evdev::{Device, EventSummary, InputEvent, KeyCode};
 use std::io::{self, Write};
+use std::option::Option;
 use std::{collections::HashSet, env, error::Error};
 
 const DEFAULT_DEVICE: &str = "/dev/input/by-id/usb-ROYUAN_Gaming_keyboard-event-kbd";
+const DISPLAY_MAX: usize = 50;
 
 #[derive(Debug, PartialEq)]
 enum KeyState {
@@ -10,8 +12,6 @@ enum KeyState {
     Pressed,
     Repeated,
 }
-
-const DISPLAY_MAX: usize = 50;
 
 fn key_state(value: i32) -> Option<KeyState> {
     match value {
@@ -34,7 +34,9 @@ fn handle_event(event: InputEvent, pressed_keys: &mut HashSet<KeyCode>) -> Optio
             KeyState::Released => {
                 pressed_keys.remove(&key);
             }
-            KeyState::Repeated => {}
+            KeyState::Repeated => {
+                return Some(key);
+            }
         }
     }
 
@@ -57,7 +59,11 @@ fn print_scroll(text: &str) {
 
 fn formatting(key: KeyCode, started_shift: &mut bool) -> String {
     let key = format!("{key:?}");
-    let key = key.to_lowercase().replace("left", "").replace("right", "");
+    let key = key
+        .to_lowercase()
+        .replace("key_", "")
+        .replace("left", "")
+        .replace("right", "");
     let mut result = String::new();
 
     if key.contains("shift") {
@@ -72,7 +78,8 @@ fn formatting(key: KeyCode, started_shift: &mut bool) -> String {
 
         if *started_shift {
             *started_shift = false;
-            result = result.to_uppercase();
+
+            return result.to_uppercase() + " ";
         }
     }
 
@@ -80,14 +87,16 @@ fn formatting(key: KeyCode, started_shift: &mut bool) -> String {
 }
 
 fn clean_display_text(text: String) -> String {
-    let mut cleaned = text.to_lowercase().replace("key_", "").replace("key", "");
+    let mut cleaned = text;
 
     cleaned = match cleaned.as_str() {
         "backspace" => "⇤".to_string(),
         "backslash" => "\\".to_string(),
         "space" => "␣".to_string(),
         "enter" => "⮠".to_string(),
-        "meta" => "super ".to_string(),
+        "meta" => "super".to_string(),
+        "minus" => "-".to_string(),
+        "equal" => "=".to_string(),
         _ => cleaned,
     };
 
@@ -100,13 +109,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         .unwrap_or_else(|| DEFAULT_DEVICE.to_owned());
 
     let mut device = Device::open(&path)?;
-    let name = device.name().unwrap_or("Unknown device");
+    let _name = device.name().unwrap_or("Unknown device");
     let mut pressed_keys = HashSet::new();
     let mut texts = String::new();
     let mut started_shift = false;
 
-    println!("Using keyboard: {name}");
-    println!("Device path: {path}");
+    // println!("Using keyboard: {name}");
+    // println!("Device path: {path}");
+    println!("\n\n\n\n\n\n\n");
 
     loop {
         for event in device.fetch_events()? {
