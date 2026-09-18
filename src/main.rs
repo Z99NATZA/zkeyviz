@@ -105,7 +105,7 @@ fn handle_event(event: InputEvent, pressed_keys: &mut HashSet<KeyCode>) -> Optio
                     return Some(shortcut_text(key, pressed_keys));
                 }
 
-                None
+                Some(clean_key_name(key, pressed_keys))
             }
             2 => {
                 if is_modifier(key) {
