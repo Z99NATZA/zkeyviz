@@ -4,43 +4,102 @@ use std::option::Option;
 use std::{collections::HashSet, env, error::Error};
 
 const DEFAULT_DEVICE: &str = "/dev/input/by-id/usb-ROYUAN_Gaming_keyboard-event-kbd";
-const DISPLAY_MAX: usize = 50;
+const DISPLAY_MAX: usize = 100;
 
-#[derive(Debug, PartialEq)]
-enum KeyState {
-    Released,
-    Pressed,
-    Repeated,
+fn is_ctrl_down(pressed_keys: &HashSet<KeyCode>) -> bool {
+    pressed_keys.contains(&KeyCode::KEY_LEFTCTRL) || pressed_keys.contains(&KeyCode::KEY_RIGHTCTRL)
 }
 
-fn key_state(value: i32) -> Option<KeyState> {
-    match value {
-        0 => Some(KeyState::Released),
-        1 => Some(KeyState::Pressed),
-        2 => Some(KeyState::Repeated),
-        _ => None,
+fn is_shift_down(pressed_keys: &HashSet<KeyCode>) -> bool {
+    pressed_keys.contains(&KeyCode::KEY_LEFTSHIFT)
+        || pressed_keys.contains(&KeyCode::KEY_RIGHTSHIFT)
+}
+
+fn is_alt_down(pressed_keys: &HashSet<KeyCode>) -> bool {
+    pressed_keys.contains(&KeyCode::KEY_LEFTALT) || pressed_keys.contains(&KeyCode::KEY_RIGHTALT)
+}
+
+fn shortcut_text(key: KeyCode, pressed_keys: &HashSet<KeyCode>) -> String {
+    let mut parts = Vec::new();
+
+    if is_ctrl_down(pressed_keys) {
+        parts.push("Ctrl".to_string());
     }
+
+    if is_shift_down(pressed_keys) {
+        parts.push("Shift".to_string());
+    }
+
+    if is_alt_down(pressed_keys) {
+        parts.push("Alt".to_string());
+    }
+
+    parts.push(clean_key_name(key, pressed_keys));
+
+    parts.join("+")
 }
 
-fn handle_event(event: InputEvent, pressed_keys: &mut HashSet<KeyCode>) -> Option<KeyCode> {
-    if let EventSummary::Key(_, key, value) = event.destructure()
-        && let Some(state) = key_state(value)
-    {
-        match state {
-            KeyState::Pressed => {
-                pressed_keys.insert(key);
-                return Some(key);
-            }
-            KeyState::Released => {
-                pressed_keys.remove(&key);
-            }
-            KeyState::Repeated => {
-                return Some(key);
-            }
+fn is_modifier(key: KeyCode) -> bool {
+    matches!(
+        key,
+        KeyCode::KEY_LEFTCTRL
+            | KeyCode::KEY_RIGHTCTRL
+            | KeyCode::KEY_LEFTSHIFT
+            | KeyCode::KEY_RIGHTSHIFT
+            | KeyCode::KEY_LEFTALT
+            | KeyCode::KEY_RIGHTALT
+    )
+}
+
+fn clean_key_name(key: KeyCode, pressed_keys: &HashSet<KeyCode>) -> String {
+    let name = format!("{key:?}")
+        .replace("KEY_LEFT", "")
+        .replace("KEY_RIGHT", "")
+        .replace("KEY_", "");
+
+    if name.len() == 1 && name.chars().all(|c| c.is_ascii_alphabetic()) {
+        if is_shift_down(pressed_keys) {
+            name.to_uppercase()
+        } else {
+            name.to_lowercase()
+        }
+    } else {
+        match name.as_str() {
+            "CTRL" => "Ctrl".to_string(),
+            "SHIFT" => "Shift".to_string(),
+            "ALT" => "Alt".to_string(),
+            _ => name,
         }
     }
+}
 
-    None
+fn handle_event(event: InputEvent, pressed_keys: &mut HashSet<KeyCode>) -> Option<String> {
+    if let EventSummary::Key(_, key, value) = event.destructure() {
+        match value {
+            0 => {
+                pressed_keys.remove(&key);
+                None
+            }
+            1 => {
+                if !pressed_keys.insert(key) {
+                    return None;
+                }
+
+                if !is_modifier(key) {
+                    return Some(shortcut_text(key, pressed_keys));
+                }
+
+                Some(clean_key_name(key, pressed_keys))
+            }
+            2 => match key {
+                KeyCode::KEY_LEFTCTRL | KeyCode::KEY_RIGHTCTRL => None,
+                _ => Some(clean_key_name(key, pressed_keys)),
+            },
+            _ => None,
+        }
+    } else {
+        None
+    }
 }
 
 fn print_scroll(text: &str) {
@@ -57,52 +116,6 @@ fn print_scroll(text: &str) {
     let _ = io::stdout().flush();
 }
 
-fn formatting(key: KeyCode, started_shift: &mut bool) -> String {
-    let key = format!("{key:?}");
-    let key = key
-        .to_lowercase()
-        .replace("key_", "")
-        .replace("left", "")
-        .replace("right", "");
-    let mut result = String::new();
-
-    if key.contains("shift") {
-        *started_shift = true;
-        return "⌅ ".to_string();
-    } else if key.contains("ctrl") {
-        result = "Ctrl".to_string();
-    } else if key.contains("alt") {
-        result = "Alt".to_string();
-    } else {
-        result = clean_display_text(key.clone());
-
-        if *started_shift {
-            *started_shift = false;
-
-            return result.to_uppercase() + " ";
-        }
-    }
-
-    format!("{result} ")
-}
-
-fn clean_display_text(text: String) -> String {
-    let mut cleaned = text;
-
-    cleaned = match cleaned.as_str() {
-        "backspace" => "⇤".to_string(),
-        "backslash" => "\\".to_string(),
-        "space" => "␣".to_string(),
-        "enter" => "⮠".to_string(),
-        "meta" => "super".to_string(),
-        "minus" => "-".to_string(),
-        "equal" => "=".to_string(),
-        _ => cleaned,
-    };
-
-    cleaned.to_lowercase()
-}
-
 fn main() -> Result<(), Box<dyn Error>> {
     let path = env::args()
         .nth(1)
@@ -112,7 +125,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     let _name = device.name().unwrap_or("Unknown device");
     let mut pressed_keys = HashSet::new();
     let mut texts = String::new();
-    let mut started_shift = false;
 
     // println!("Using keyboard: {name}");
     // println!("Device path: {path}");
@@ -121,9 +133,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     loop {
         for event in device.fetch_events()? {
             if let Some(key) = handle_event(event, &mut pressed_keys) {
-                let key = formatting(key, &mut started_shift);
-                texts.push_str(key.as_str());
-                print_scroll(texts.as_str());
+                texts.push_str(&key);
+                texts.push(' ');
+                print_scroll(&texts);
             }
         }
     }
