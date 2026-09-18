@@ -64,12 +64,28 @@ fn clean_key_name(key: KeyCode, pressed_keys: &HashSet<KeyCode>) -> String {
             name.to_lowercase()
         }
     } else {
-        match name.as_str() {
-            "CTRL" => "Ctrl".to_string(),
-            "SHIFT" => "Shift".to_string(),
-            "ALT" => "Alt".to_string(),
+        let name = name.as_str();
+
+        let text = match name {
+            "CTRL" => "Ctrl",
+            "SHIFT" => "Shift",
+            "ALT" => "Alt",
+            "ESC" => "Esc",
+            "ENTER" => "⤶",
+            "SPACE" => "",
+            "BACKSPACE" => "⇤",
+            "EQUAL" => "=",
+            "MINUS" => "-",
+            "COMMA" => ",",
+            "BACKSLASH" => "\\",
+            "SLASH" => "/",
+            "DOT" => ".",
+            "SEMICOLON" => ";",
+            "COLON" => ":",
             _ => name,
-        }
+        };
+
+        text.to_string()
     }
 }
 
@@ -89,12 +105,15 @@ fn handle_event(event: InputEvent, pressed_keys: &mut HashSet<KeyCode>) -> Optio
                     return Some(shortcut_text(key, pressed_keys));
                 }
 
-                Some(clean_key_name(key, pressed_keys))
+                None
             }
-            2 => match key {
-                KeyCode::KEY_LEFTCTRL | KeyCode::KEY_RIGHTCTRL => None,
-                _ => Some(clean_key_name(key, pressed_keys)),
-            },
+            2 => {
+                if is_modifier(key) {
+                    None
+                } else {
+                    Some(clean_key_name(key, pressed_keys))
+                }
+            }
             _ => None,
         }
     } else {
