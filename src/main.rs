@@ -19,6 +19,10 @@ fn is_alt_down(pressed_keys: &HashSet<KeyCode>) -> bool {
     pressed_keys.contains(&KeyCode::KEY_LEFTALT) || pressed_keys.contains(&KeyCode::KEY_RIGHTALT)
 }
 
+fn is_super_down(pressed_keys: &HashSet<KeyCode>) -> bool {
+    pressed_keys.contains(&KeyCode::KEY_LEFTMETA) || pressed_keys.contains(&KeyCode::KEY_RIGHTMETA)
+}
+
 fn shortcut_text(key: KeyCode, pressed_keys: &HashSet<KeyCode>) -> String {
     let mut parts = Vec::new();
 
@@ -32,6 +36,10 @@ fn shortcut_text(key: KeyCode, pressed_keys: &HashSet<KeyCode>) -> String {
 
     if is_alt_down(pressed_keys) {
         parts.push("Alt".to_string());
+    }
+
+    if is_super_down(pressed_keys) {
+        parts.push("Super".to_string());
     }
 
     parts.push(clean_key_name(key, pressed_keys));
@@ -72,7 +80,7 @@ fn clean_key_name(key: KeyCode, pressed_keys: &HashSet<KeyCode>) -> String {
             "ALT" => "Alt",
             "ESC" => "Esc",
             "ENTER" => "⤶",
-            "SPACE" => "",
+            "SPACE" => "␣",
             "BACKSPACE" => "⇤",
             "EQUAL" => "=",
             "MINUS" => "-",
@@ -82,6 +90,7 @@ fn clean_key_name(key: KeyCode, pressed_keys: &HashSet<KeyCode>) -> String {
             "DOT" => ".",
             "SEMICOLON" => ";",
             "COLON" => ":",
+            "META" => "Super",
             _ => name,
         };
 
